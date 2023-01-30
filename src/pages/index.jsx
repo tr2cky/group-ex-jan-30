@@ -10,19 +10,49 @@ import retextPos from "retext-pos";
 import retextKeywords from "retext-keywords";
 import { toString } from "nlcst-to-string";
 
-const KEYWORDS_DATA = "keywords_data";
-
-async function extractKeywords(text) {
-  let keywords = [];
-  let toProcess = await retext()
+async function getKeywords(text) {
+  const keywords = await retext()
     .use(retextPos)
     .use(retextKeywords)
     .process(text);
 
-  toProcess.data.keywords.forEach((kw) => {
-    keywords.push(toString(kw.matches[0].node));
-  });
   return keywords;
+}
+
+export default function Home() {
+  const inputRef = useRef();
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    if (data.length !== 0) {
+      localStorage.setItem("notes", JSON.stringify(data));
+    }
+  }, [data]);
+
+  useEffect(() => {
+    localStorage.getItem("notes") && setData(JSON.parse(localStorage.getItem("notes")));
+  }, []);
+
+
+  const clickHandler = () => {
+    let v = inputRef.current.value;
+    let toSave = { text: v, keywords: [], timestamp: Date.now() };
+    getKeywords(v)
+      .then((keywords) => {
+        keywords.data.keywords.forEach((keyword) => {
+          toSave.keywords.push(toString(keyword.matches[0].node));
+        });
+        setData([toSave, ...data]);
+      })
+  }
+
+  return (
+    <div>
+      <input ref={inputRef} type="text" id="input" />
+      <button onClick={clickHandler} id="button">Submit</button>
+      <Posts data={data} />
+    </div>
+  )
 }
 
 function Posts({ data }) {
@@ -35,38 +65,5 @@ function Posts({ data }) {
         </div>
       ))}
     </div>
-  );
-}
-
-export default function Home() {
-  const inputRef = useRef();
-  const [data, setData] = useState([]);
-
-  // saves data to localstorage
-  useEffect(() => {
-    if (data.length !== 0) {
-      localStorage.setItem(KEYWORDS_DATA, JSON.stringify(data));
-    }
-  }, [data]);
-
-  useEffect(() => {
-    setData(JSON.parse(localStorage.getItem(KEYWORDS_DATA)) || []);
-  }, []);
-
-  const inputHandler = async (ev) => {
-    let v = inputRef.current.value;
-    let toSave = { text: v, keywords: [], timestamp: Date.now() };
-    toSave.keywords = await extractKeywords(v);
-    setData([toSave, ...data]);
-  };
-
-  return (
-    <div className={styles.main}>
-      <div className={styles.main_content}>
-        <textarea placeholder="Input text here." ref={inputRef}></textarea>
-        <button onClick={inputHandler}>Save</button>
-        <Posts data={data}></Posts>
-      </div>
-    </div>
-  );
+  )
 }
